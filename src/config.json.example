@@ -1,0 +1,27 @@
+{
+    "networks" : [{
+        "__type":"",
+        "network_id": 0,
+        "rpc": "",
+        "secret_share": {
+            "value" : ""
+        },
+        "vault_address" : "",
+        "node_id" : "1"
+    },{
+        "__type":"",
+        "network_id": 1,
+        "rpc": "",
+        "secret_share": {
+            "value" : ""
+        },
+        "vault_address" : "",
+        "node_id" : ""
+    }],
+    "cf_network" :{
+        "__type":"",
+        "rpc" : "",
+        "storage_address" : "",
+        "threshold" : 3
+    }
+}
