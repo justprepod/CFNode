@@ -7,10 +7,7 @@ export class BashRunner{
     static async run(cmd : string) : Promise<string> {
         try {
             const { stdout, stderr } = await execAsync(cmd);
-
-            //console.log("stderr=", stderr);
-            //console.log("stdout=", stdout);
-            
+           
             if (stderr) {
                 throw new Error(stderr);
             }

@@ -11,8 +11,10 @@
   "license": "ISC",
   "dependencies": {
     "@types/mocha": "^10.0.6",
+    "bignumber.js": "^9.1.2",
     "cross-env": "^7.0.3",
     "mocha": "^10.4.0",
+    "rlp": "^3.0.0",
     "sqlite3": "^5.1.7",
     "ts-node": "^10.9.2",
     "web3": "^4.8.0",

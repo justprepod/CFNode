@@ -1,17 +1,17 @@
 import {Web3}  from "web3";
 import {Connector} from "./Connector";
-import {AppConfig, LockData, LockInfo, Coalition, SigPartI, SigPartII, Transaction, Hash, Signature, calculate_object_hash, AckData} from "./Utils";
+import {AppConfig, LockData, LockInfo, Coalition, SigPartI, SigPartII, Transaction, Hash, Signature, AckData, SigShare, calculate_object_hash} from "./Utils";
 import sqlite3 from 'sqlite3';
 import {Logger, create_logger } from './Logger';
 
 let log : any = create_logger('silly');
 
 export class StubConnector implements Connector {
-    //config : StubConfig;
     db : any;
 
-    db_run(method : string, request : string){
+    db_run(method : string, request : string) : Promise<Array<any>>{
         let db = this.db;
+        log.silly(`SQLITE: ${request}`);
         return new Promise(function(resolve, reject){
             try {
                 db[method](request, (err, rows) => {
@@ -28,13 +28,12 @@ export class StubConnector implements Connector {
     }
 
     constructor (filename : string){
-        log.debug(`StubConnector::constructor(${filename})`);
-        //this.config = config;
+        log.verbose(`StubConnector::constructor(${filename})`);
         this.db = new sqlite3.Database(filename);
     }
 
-    async send_tx(tx : Transaction) : Promise<Hash>{
-        log.debug(`StubConnector::send_tx(${JSON.stringify(tx)})`);
+    async send_lock(tx : Transaction) : Promise<Hash>{
+        log.verbose(`StubConnector::send_tx(${JSON.stringify(tx)})`);
         let hash = tx.hash();
         await this.db_run('run', 'BEGIN TRANSACTION');
         let sql = this.db.prepare(`INSERT OR IGNORE INTO txs (hash, data) VALUES(?, ?)`);
@@ -44,9 +43,9 @@ export class StubConnector implements Connector {
     }
 
     async read_lock(lock_info : LockInfo) : Promise<LockData> {
-        log.debug(`StubConnector::read_lock(${JSON.stringify(lock_info)})`);
+        log.verbose(`StubConnector::read_lock(${JSON.stringify(lock_info)})`);
         let sql = `SELECT * FROM txs WHERE hash = '${lock_info.tx_hash.hex}'`;
-        log.verbose(`sql = ${sql}`);
+        log.silly(`sql = ${sql}`);
         let row : any = await this.db_run('get', sql);
 
         let lock_data : LockData;
@@ -63,42 +62,85 @@ export class StubConnector implements Connector {
         }
     }
 
-    async send_acknowledgment(lock_info : LockInfo, ack_data : AckData){
-        log.debug(`CFConnectorStub::send_acknowledgment(${JSON.stringify(lock_info)})`);
-        log.assert(lock_info.network_id == 0, "this version allows only from 0 to 1 direction");
+    async send_acknowledgment(ack_data : AckData) : Promise<boolean>{
+        log.verbose(`StubConnector::send_acknowledgment(${JSON.stringify(ack_data)})`);
 
-        let lock_hash = calculate_object_hash(lock_info);
-        let sql : string = `INSERT OR IGNORE INTO storage (key, value) VALUES('${lock_hash.hex}', '${ack_data.id}')`;
-        this.db_run('run', sql);
+        await this.db_run('run', 'BEGIN TRANSACTION');
+        let sql : string = `INSERT OR REPLACE INTO storage (type, key, value) VALUES('acknowledgment', '${ack_data.hash}', '${ack_data.id}')`;
+        await this.db_run('run', sql);
+        await this.db_run('run', 'COMMIT TRANSACTION');
+
+        return true;
     }
 
     /**
      * Reads acknowledments to participate in coalition for certain lock transaction
-     * @param lock_info
+     * @param hash
      * @returns 
      */
-    async read_acknowledments(lock_info : LockInfo) : Promise<Coalition>{
-        log.debug(`CFConnectorStub::read_acknowledments(${JSON.stringify(lock_info)})`);
-        throw "not implemented";
+    async read_acknowledments(hash : Hash) : Promise<Coalition>{
+        log.verbose(`StubConnector::read_acknowledments(${hash.hex})`);
 
+        let coalition : Coalition = {members:[]};
+
+        let sql : string = `SELECT * FROM storage WHERE type='acknowledgment' AND key='${hash.hex}'`;
+        let rows : Array<any> = await this.db_run('all', sql);
+        rows.forEach(r => coalition.members.push(r.value));
+
+        return coalition;
     }
 
+    /**
+     * Sends array of SigPartI to storage.
+     * @param sig_part_i 
+     * @returns 
+     */
     async send_sig_part_i(lock_info : LockInfo, sig_part_i : SigPartI){
-        log.debug(`CFConnectorStub::send_sig_part_i(${JSON.stringify(lock_info)}, ${JSON.stringify(sig_part_i)})`);
-        return false;
+        log.verbose(`StubConnector::send_sig_part_i(${JSON.stringify(lock_info)}, ${JSON.stringify(sig_part_i)})`);
+
+        let lock_hash : Hash = calculate_object_hash(lock_info);
+
+        await this.db_run('run', 'BEGIN TRANSACTION');
+        sig_part_i.shares.forEach(async share => {
+            //let sql : string = `INSERT OR REPLACE INTO storage (type, key, value) VALUES('sig_i', '${sig_part_i.tx_hash}', '${JSON.stringify(share)}')`;
+            let sql : string = `INSERT OR REPLACE INTO storage (type, key, value) VALUES('sig_i', '${lock_hash.hex}', '${JSON.stringify(share)}')`;
+            await this.db_run('run', sql);
+        });
+        await this.db_run('run', 'COMMIT TRANSACTION');
+
+        return true;
     }
 
-    async read_sigs_i(lock_info : LockInfo) : Promise<Array<SigPartI>>{
-        let sigs_i : Array<SigPartI>;
+    /**
+     * Reads designated to certain node array of SigPartI associated with lock information
+     * @param hash 
+     * @returns 
+     */
+    async read_sigs_i(hash : Hash, node_id : string) : Promise<Array<SigShare>>{
+        log.verbose(`StubConnector::read_sigs_i(${hash.hex}, ${node_id})`);
+
+        let sigs_i : Array<SigShare> = [];
+
+        let sql : string = `SELECT * FROM storage WHERE type='sig_i' AND key='${hash.hex}'`;
+        let rows : Array<any> = await this.db_run('all', sql);
+
+        log.silly(`StubConnector::read_sigs_i - rows = ${JSON.stringify(rows)}`);
+
+        let rows_parsed = rows.map(r => (JSON.parse(r.value)));
+
+        log.silly(`StubConnector::read_sigs_i - rows_parsed = ${JSON.stringify(rows_parsed)}`);
+
+        sigs_i = rows_parsed.filter(r => r.to === node_id);
 
         return sigs_i;
     }
 
     async send_sig_part_ii(lock_info : LockInfo, sig_part_i : SigPartII){
+        throw "not implemented";
         return false;
     }    
 
-    async read_sigs_ii(lock_info : LockInfo) : Promise<Array<SigPartII>>{
+    async read_sigs_ii(hash : Hash) : Promise<Array<SigPartII>>{
         let sigs_ii : Array<SigPartII>;
 
         return sigs_ii;

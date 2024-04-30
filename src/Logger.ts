@@ -1,4 +1,5 @@
 import { createLogger, transports, format, Logger } from "winston";
+
 export {Logger} from "winston";
 
 BigInt.prototype["toJSON"] = function () {
@@ -11,7 +12,7 @@ export function create_logger(loglevel : string) : Logger{
         level:loglevel,
         transports: [new transports.Console()],
         format: format.combine(
-            format.colorize(),
+            format.colorize({all : true}),
             format.timestamp(),
             format.printf(({ timestamp, level, message }) => {
             return `[${timestamp}] ${level}: ${message}`;

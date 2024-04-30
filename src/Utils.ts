@@ -2,6 +2,7 @@ import { EthereumConnector } from "./EthereumConnector";
 import { Connector } from "./Connector";
 import {createHash} from 'crypto';
 import {Logger, create_logger } from './Logger';
+import { Bytes } from "web3";
 
 
 let log : any = create_logger('silly');
@@ -17,8 +18,6 @@ export interface EtherConfig{
     network_id : number;
     rpc : string;
     vault_address : EthereumAddress;
-    secret_share : SecretShare;
-    node_id : string;
     iface? : Connector;
 }
 
@@ -27,8 +26,6 @@ export interface StubConfig{
     network_id : number;
     filename : string;
     vault_address : string;
-    secret_share : SecretShare;
-    node_id : string;
     iface? : Connector;
 }
 
@@ -37,12 +34,11 @@ export interface ZanoConfig{
     network_id : number;
     rpc : string;
     vault_address : EthereumAddress;
-    secret_share : SecretShare;
-    node_id : string;
     iface? : Connector;
 }
 
 export interface AckData {
+    hash : string,
     id : string;
 }
 
@@ -51,6 +47,8 @@ export interface CFNetworkConfig{
     rpc : string;
     storage_address : EthereumAddress;
     threshold : number;
+    secret_share : SecretShare;
+    node_id : string;
 }
 
 export type NetworkConfig = Array<EtherConfig | ZanoConfig | StubConfig>;
@@ -63,15 +61,18 @@ export interface AppConfig{
 export class Hash {
     private _value : string;
 
-    constructor(_ : string){
+    constructor(_ : string | Bytes){
         this.hex = _;
     }
 
-    public set hex(_ : string){
-        log.assert(typeof _ === 'string', `Bad type of _, ${_} type must be string, not ${typeof _}`);
-        log.assert(/^[0-9a-fA-F]{64}$/.test(_), `_ must be 64-character hexadecimal value, not '${_}'`);
-
-        this._value = _;
+    public set hex(_ : string | Bytes){
+        if (typeof _ === 'string'){
+            log.assert(/^(0x)?[0-9a-fA-F]{64}$/.test(_), `_ must be 64-character hexadecimal value, not '${_}'`);
+            this._value = _;
+        } else if (typeof _ === 'number'){
+        } else {
+            throw `Bad type of _ - ${typeof _}`;
+        }
     }
 
     public get hex() : string{
@@ -121,8 +122,16 @@ export class Transaction{
     }
 }
 
+export interface SigShare{
+    from : string;
+    to : string;
+    share : string;
+}
+
 export interface SigPartI{
-    shares : Array<string>;
+    tx_hash : string;
+    node_id : string;
+    shares : Array<SigShare>;
 }
 
 export interface SigPartII{
@@ -196,18 +205,8 @@ export interface TokenMatchInfo{
     dst_decimals : number;
 }
 export function calculate_object_hash(obj) : Hash {
-    const sortedObj = {};
-    Object.keys(obj).sort().forEach(key => {
-        sortedObj[key] = obj[key];
-    });
-
+    //TODO: correct fields hashing
     const hash = createHash('sha256');
-    Object.values(sortedObj).forEach(value => {
-        hash.update(value.toString());
-    });
-
-    const concatenatedHashes = hash.digest('hex');
-    const finalHash = createHash('sha256').update(concatenatedHashes).digest('hex');
-
-    return new Hash(finalHash);
+    hash.update(JSON.stringify(obj));
+    return new Hash(hash.digest('hex'));
 }
