@@ -1,6 +1,6 @@
 import {AppConfig, LockData, LockInfo, Coalition, SigPartI, SigPartII, Transaction, Hash, Signature, SigShare} from "./Utils";
 import { BashRunner } from "./BashRunner";
-import { signMessage } from "./mathlib/ecdsa.js";
+import { signMessage } from "./mathlib/ecdsa";
 import RLP from "rlp";
 import {Web3}  from "web3";
 
@@ -19,9 +19,11 @@ export class ShamirMath {
         let web3 = new Web3();
 
         let encoded = RLP.encode([nonce, gasPrice, gasLimit, to, value, data]);
-        let hash_origin = "0x" + web3.utils.sha3(encoded);
-        let sign_encoded = signMessage(hash_origin, pk);
 
+        let hash_origin = "0x" + web3.utils.sha3(encoded);
+
+        let sign_encoded = signMessage(hash_origin, pk);
+/*
         let v = 27;
 
         let signed_transaction = RLP.encode([
@@ -36,7 +38,7 @@ export class ShamirMath {
             sign_encoded.s,
         ]);
 
-        return signed_transaction;
+        return signed_transaction;*/
     }
 
     /**
