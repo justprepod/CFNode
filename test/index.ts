@@ -49,9 +49,10 @@ let sender_sk = "58ee1c2fb9e9d47215735e4480f25758494ff96e8bda9bf3a3c698ba4b5091c
 let vault_address = '0x7Eb8E4467cd62e1D8D888C253929eCaDB2AcD42d';
 let src_token_hash = '0x7E25310573883d838E751831D994548f251c46b4';
 let dst_token_hash = '0x911F5FF28Efc0599eF75E7F16b67DF136ec6b5B1';
+let random_token_hash = '';
+let random_address = '0xf784C9bca8BbDD93A195aeCdBa23472f89B1E7d6';
 
-
-let default_tx : Transaction = new Transaction({from : sender_address, to : vault_address, amount : "100", asset: src_token_hash});
+let default_tx : Transaction = new Transaction({from : sender_address, to : vault_address, amount : "1", asset: src_token_hash});
 
 describe('happy_case', function () {
     this.timeout(0);
@@ -72,16 +73,14 @@ describe('happy_case', function () {
     });
 
     it('simple bridge', async function () {
-        /*
         let lock_tx = default_tx;
         let lock_tx_hash : Hash = await c.send_lock(lock_tx, sender_sk);        
         assert(lock_tx_hash);
         log.info(`successfully sent transaction ${lock_tx_hash.hex}`);
 
         let lock_info : LockInfo = {network_id: 0, tx_hash: lock_tx_hash};
-        */
 
-        let lock_info : LockInfo = {network_id: 0, tx_hash: new Hash(`0x0c18cd4400520e7f5016a30af097c21c10021f38f3160f12a3450fd46c0be319`)};
+        //lock_info = {network_id: 0, tx_hash: new Hash(`0x8910937562fa7e50e3ee0d466aaa5f960e53d43270b0a5725b5ebc90bf51d4af`)};
 
         let notify_result1 : boolean = await node1.on_notify(lock_info);
         assert(notify_result1);
@@ -97,6 +96,12 @@ describe('happy_case', function () {
         
         let sig_part_ii_result1 : boolean = await node1.init_sig_part_ii(lock_info);
         assert(sig_part_ii_result1);
+
+        let sig_part_ii_result2 : boolean = await node2.init_sig_part_ii(lock_info);
+        assert(sig_part_ii_result2);
+
+        let signed_tx = await node1.init_signature(lock_info);
+        assert(signed_tx);
     })
 })
 
@@ -119,18 +124,17 @@ describe('algorithm failures', function(){
     });
 
     it('bad notify hash', async function(){        
-        let lock_tx = default_tx;
-        
-        let notify_result : boolean = await node1.on_notify({network_id: 0, tx_hash: lock_tx.hash()});
+        let lock_info : LockInfo = {network_id: 0, tx_hash: new Hash("0x0000000000000000000000000000000000000000000000000000000000000001")};
+
+        let notify_result : boolean = await node1.on_notify(lock_info);
         assert(notify_result == false);
     })
 
     it('bad destination address', async function(){        
-        let lock_tx = default_tx;
+        let lock_tx = new Transaction({from : sender_address, to : random_address, amount : "1", asset: src_token_hash});;
 
         let lock_tx_hash : Hash = await c.send_lock(lock_tx, sender_sk);        
         assert(lock_tx_hash);
-        log.info(`successfully sent transaction ${lock_tx_hash.hex}`);
 
         let lock_info : LockInfo = {network_id: 0, tx_hash: lock_tx_hash};
 
@@ -139,16 +143,10 @@ describe('algorithm failures', function(){
     })
 
     it('bad token', async function(){        
-        let lock_tx = default_tx;
+        let lock_tx = new Transaction({from : sender_address, to : vault_address, amount : "100", asset: random_token_hash});
 
-        let lock_tx_hash : Hash = await c.send_lock(lock_tx, sender_sk);        
-        assert(lock_tx_hash);
-        log.info(`successfully sent transaction ${lock_tx_hash.hex}`);
-
-        let lock_info : LockInfo = {network_id: 0, tx_hash: lock_tx_hash};
-
-        let notify_result : boolean = await node1.on_notify(lock_info);
-        assert(notify_result == false);
+        let lock_tx_hash : Hash = await c.send_lock(lock_tx, sender_sk);
+        assert(lock_tx_hash == undefined);
 
     })
 
@@ -157,7 +155,6 @@ describe('algorithm failures', function(){
 
         let lock_tx_hash : Hash = await c.send_lock(lock_tx, sender_sk);        
         assert(lock_tx_hash);
-        log.info(`successfully sent transaction ${lock_tx_hash.hex}`);
 
         let lock_info : LockInfo = {network_id: 0, tx_hash: lock_tx_hash};
 
@@ -174,7 +171,6 @@ describe('algorithm failures', function(){
 
         let lock_tx_hash : Hash = await c.send_lock(lock_tx, sender_sk);        
         assert(lock_tx_hash);
-        log.info(`successfully sent transaction ${lock_tx_hash.hex}`);
 
         let lock_info : LockInfo = {network_id: 0, tx_hash: lock_tx_hash};
 
@@ -190,4 +186,32 @@ describe('algorithm failures', function(){
         let sig_part_ii_result1 : boolean = await node1.init_sig_part_ii(lock_info);
         assert(sig_part_ii_result1 == false);
     })
+
+    it('not enoughs sigs_ii', async function () {
+        let lock_tx = default_tx;
+
+        let lock_tx_hash : Hash = await c.send_lock(lock_tx, sender_sk);        
+        assert(lock_tx_hash);
+
+        let lock_info : LockInfo = {network_id: 0, tx_hash: lock_tx_hash};
+
+        let notify_result1 : boolean = await node1.on_notify(lock_info);
+        assert(notify_result1);
+
+        let notify_result2 : boolean = await node2.on_notify(lock_info);
+        assert(notify_result2);
+
+        let sig_part_i_result1 : boolean = await node1.init_sig_part_i(lock_info);
+        assert(sig_part_i_result1);
+
+        let sig_part_i_result2 : boolean = await node2.init_sig_part_i(lock_info);
+        assert(sig_part_i_result2);
+
+        let sig_part_ii_result1 : boolean = await node1.init_sig_part_ii(lock_info);
+        assert(sig_part_ii_result1);
+
+        let signed_tx = await node1.init_signature(lock_info);
+        assert(signed_tx == false);
+    })
+
 })

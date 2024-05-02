@@ -174,10 +174,13 @@ export class CFNode {
 
     async start_sig_part_ii(lock_info, sigs_i : Array<SigShare>) : Promise<boolean>{
         log.verbose(`CFNode::start_sig_part_ii(${JSON.stringify(lock_info)}, ${JSON.stringify(sigs_i)})`);
-        let sig_part_ii : SigPartII = ShamirMath.create_sig_part_ii(sigs_i);
+        let sig_part_ii : SigPartII = await ShamirMath.create_sig_part_ii(this.config.cf_network.node_id, sigs_i);
+        if (!sig_part_ii){
+            return false;
+        }
         await this.cf_connector.send_sig_part_ii(lock_info, sig_part_ii);
         log.debug(`CFNode::start_sig_part_ii - sig_part_ii = ${JSON.stringify(sig_part_ii)}`);
-        return false;
+        return true;
     }
 
     async init_sig_part_ii(lock_info : LockInfo) : Promise<boolean>{
@@ -203,22 +206,23 @@ export class CFNode {
     }
 
     async start_signature(lock_info, sigs_ii : Array<SigPartII>) {
-        let signature = await ShamirMath.create_signature(sigs_ii);
+        let signature = await ShamirMath.create_signature(sigs_ii);        
         return signature;
     }
 
     async init_signature(lock_info : LockInfo){
-        //read all signature parts ii
-        throw "not implemented";
-        /*
-        let sigs_ii : Array<SigPartII> = await this.cf_connector.read_sigs_ii(lock_info);
+        log.verbose(`CFNode::init_signature(${JSON.stringify(lock_info)})`);
+
+        let hash = calculate_object_hash(lock_info);
+        let sigs_ii : Array<SigPartII> = await this.cf_connector.read_sigs_ii(hash);
         let threshold = this.config.cf_network.threshold;
 
         if (sigs_ii.length >= threshold){
-            await this.start_signature(lock_info, sigs_ii);
+            return await this.start_signature(lock_info, sigs_ii);
         } else {
-            log.debug(`Not enough sigs_ii for processing ${lock_info}. ${threshold} of ${sigs_ii.length} agreed`);
-        }*/
+            log.debug(`Not enough sigs_ii for processing ${JSON.stringify(lock_info)}. ${threshold} of ${sigs_ii.length} agreed`);
+            return false;
+        }
     }
 
     /**

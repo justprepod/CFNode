@@ -1,6 +1,6 @@
 import {AppConfig, LockData, LockInfo, Coalition, SigPartI, SigPartII, Transaction, Hash, Signature, SigShare} from "./Utils";
 import { BashRunner } from "./BashRunner";
-import { signMessage } from "./mathlib/ecdsa";
+import { signMessage } from "./ecdsa";
 import RLP from "rlp";
 import {Web3}  from "web3";
 
@@ -23,7 +23,6 @@ export class ShamirMath {
         let hash_origin = "0x" + web3.utils.sha3(encoded);
 
         let sign_encoded = signMessage(hash_origin, pk);
-/*
         let v = 27;
 
         let signed_transaction = RLP.encode([
@@ -38,17 +37,17 @@ export class ShamirMath {
             sign_encoded.s,
         ]);
 
-        return signed_transaction;*/
+        return signed_transaction;
     }
 
     /**
      * Creates shares of Ki = P(id) for each coalition member
      */
     static async create_sig_part_i(tx_hash : Hash, node_id : string, coalition : Coalition) : Promise<SigPartI>{
-        log.debug(`ShamirMath::create_sig_part_i(${tx_hash.hex}, ${node_id}, ${JSON.stringify(coalition)})`);        
+        log.verbose(`ShamirMath::create_sig_part_i(${tx_hash.hex}, ${node_id}, ${JSON.stringify(coalition)})`);        
         let sig_part_i : SigPartI;
         let cmd : string = `sage ~/sig_part_i.sage ${coalition.members.join(" ")}`;
-        log.verbose(`ShamirMath::create_sig_part_i - running cmd '${cmd}'`);
+        log.silly(`ShamirMath::create_sig_part_i - running cmd '${cmd}'`);
         let stdout = await BashRunner.run(cmd);
 
         log.debug(`ShamirMath::create_sig_part_i - parsing ${stdout.trim()} result of sagemath`);        
@@ -74,13 +73,29 @@ export class ShamirMath {
         return sig_part_i;
     }
 
-    static async create_sig_part_ii(sigs_i : Array<SigShare>) : Promise<SigPartII>{
+    static async create_sig_part_ii(node_id : string, sigs_i : Array<SigShare>) : Promise<SigPartII>{
+        log.verbose(`ShamirMath::create_sig_part_ii(${JSON.stringify(sigs_i)})`);
         let sig_part_ii : SigPartII;
+
+        let cmd : string = `sage ~/sig_part_ii.sage ${sigs_i.join(" ")}`;
+        log.silly(`ShamirMath::create_sig_part_ii - running cmd '${cmd}'`);
+        let stdout = await BashRunner.run(cmd);
+
+        log.debug(`ShamirMath::create_sig_part_ii - parsing ${stdout.trim()} result of sagemath`);
+
+        let raw_share = JSON.parse(stdout);
+
+        if (typeof raw_share == 'object'){
+            sig_part_ii = {node_id, share: raw_share.value};
+        } else {
+            throw `ShamirMath::create_sig_part_ii - external script returned bad result '${stdout}' - string expected`;
+        }
+
         return sig_part_ii;
     }
 
     static async create_signature(sigs_ii : Array<SigPartII>) : Promise<Signature>{
-        let sign : Signature;
+        let sign : Signature = {r : "", s : ""};
         return sign;
     }
 }

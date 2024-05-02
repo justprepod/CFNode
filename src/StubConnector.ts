@@ -102,7 +102,6 @@ export class StubConnector implements Connector {
 
         await this.db_run('run', 'BEGIN TRANSACTION');
         sig_part_i.shares.forEach(async share => {
-            //let sql : string = `INSERT OR REPLACE INTO storage (type, key, value) VALUES('sig_i', '${sig_part_i.tx_hash}', '${JSON.stringify(share)}')`;
             let sql : string = `INSERT OR REPLACE INTO storage (type, key, value) VALUES('sig_i', '${lock_hash.hex}', '${JSON.stringify(share)}')`;
             await this.db_run('run', sql);
         });
@@ -119,8 +118,6 @@ export class StubConnector implements Connector {
     async read_sigs_i(hash : Hash, node_id : string) : Promise<Array<SigShare>>{
         log.verbose(`StubConnector::read_sigs_i(${hash.hex}, ${node_id})`);
 
-        let sigs_i : Array<SigShare> = [];
-
         let sql : string = `SELECT * FROM storage WHERE type='sig_i' AND key='${hash.hex}'`;
         let rows : Array<any> = await this.db_run('all', sql);
 
@@ -130,20 +127,35 @@ export class StubConnector implements Connector {
 
         log.silly(`StubConnector::read_sigs_i - rows_parsed = ${JSON.stringify(rows_parsed)}`);
 
-        sigs_i = rows_parsed.filter(r => r.to === node_id);
+        let sigs_i : Array<SigShare> = rows_parsed.filter(r => r.to === node_id);
 
         return sigs_i;
     }
 
-    async send_sig_part_ii(lock_info : LockInfo, sig_part_i : SigPartII){
-        throw "not implemented";
-        return false;
-    }    
+    async send_sig_part_ii(lock_info : LockInfo, sig_part_ii : SigPartII){
+        log.verbose(`StubConnector::send_sig_part_ii(${JSON.stringify(lock_info)}, ${JSON.stringify(sig_part_ii)})`);
+        let lock_hash : Hash = calculate_object_hash(lock_info);
+
+        await this.db_run('run', 'BEGIN TRANSACTION');
+        let sql : string = `INSERT OR REPLACE INTO storage (type, key, value) VALUES('sig_ii', '${lock_hash.hex}', '${JSON.stringify(sig_part_ii)}')`;
+        await this.db_run('run', sql);
+        await this.db_run('run', 'COMMIT TRANSACTION');
+
+        return true;
+    }
 
     async read_sigs_ii(hash : Hash) : Promise<Array<SigPartII>>{
-        let sigs_ii : Array<SigPartII>;
+        log.verbose(`StubConnector::read_sigs_ii(${hash.hex})`);
+
+        let sql : string = `SELECT * FROM storage WHERE type='sig_ii' AND key='${hash.hex}'`;
+        let rows : Array<any> = await this.db_run('all', sql);
+
+        log.silly(`StubConnector::read_sigs_ii - rows = ${JSON.stringify(rows)}`);
+
+        let sigs_ii : Array<SigPartII> = rows.map(r => (JSON.parse(r.value)));
+
+        log.silly(`StubConnector::read_sigs_ii - rows_parsed = ${JSON.stringify(sigs_ii)}`);
 
         return sigs_ii;
     }
-    
 }

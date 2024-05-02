@@ -81,6 +81,8 @@ export class Hash {
 };
 
 export interface Signature{
+    r : string;
+    s : string;
 }
 
 export class Transaction{
@@ -135,6 +137,8 @@ export interface SigPartI{
 }
 
 export interface SigPartII{
+    node_id : string;
+    share : string;
 }
 
 export interface Coalition{

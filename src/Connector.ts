@@ -15,5 +15,5 @@ export interface Connector {
 
     send_sig_part_ii(lock_info : LockInfo, sig_part_i : SigPartII);
 
-    read_sigs_ii(hash : Hash, node_id : string) : Promise<Array<SigPartII>>;
+    read_sigs_ii(hash : Hash) : Promise<Array<SigPartII>>;
 }
